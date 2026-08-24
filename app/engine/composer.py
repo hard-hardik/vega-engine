@@ -417,10 +417,11 @@ COMPLIANCE/REGULATION ALERT:
         elif kind == "perf_spike":
             metric = payload.get("metric", "views")
             delta = payload.get("delta_pct", 0.15)
+            offer_msg = f'Your offer "{offer_text}" is working. ' if offer_text else ""
             return (
                 f"{salutation}, great news — your {metric} are up {delta:.0%} this week "
                 f"({views} views, {calls} calls)! "
-                f"{'Your offer \"' + offer_text + '\" is working. ' if offer_text else ''}"
+                f"{offer_msg}"
                 f"Want me to boost this momentum with a follow-up campaign?"
             )
 
@@ -485,10 +486,11 @@ COMPLIANCE/REGULATION ALERT:
             count = payload.get("occurrences_30d", 4)
             quote = payload.get("common_quote", "")
             sentiment_word = "concern" if sentiment == "neg" else "praise"
+            quote_msg = f'Common quote: "{quote[:50]}..." ' if quote else ""
             return (
                 f"{salutation}, noticed '{theme}' came up {count} times in recent reviews "
                 f"({sentiment_word}). "
-                f"{('Common quote: \"' + quote[:50] + '...\" ') if quote else ''}"
+                f"{quote_msg}"
                 f"Want me to draft a response template + improvement checklist?"
             )
 
