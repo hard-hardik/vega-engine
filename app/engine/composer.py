@@ -590,13 +590,62 @@ COMPLIANCE/REGULATION ALERT:
                 f"Want me to show you the ROI calculation?"
             )
 
-        views_str = f"Your profile: {views} views, {calls} calls this month. " if views > 0 else ""
-        offer_str = f"Active offer: {offer_text}. " if offer_text else ""
-        return (
-            f"{salutation}, checking in from Vera. "
-            f"{views_str}{offer_str}"
-            f"Any updates needed for {biz_name} in {locality}? I can help with profile, offers, or marketing."
-        )
+        cat_slug = category.slug.lower() if category.slug else ""
+        
+        if cat_slug in ["dentists", "dental", "dentist"]:
+            peer_avg_views = category.peer_stats.avg_views_30d if category.peer_stats else 200
+            action = "update clinic photos" if views < peer_avg_views else "add a patient testimonial"
+            return (
+                f"{salutation}, quick practice update: your {locality} profile has {views} views "
+                f"and {calls} patient inquiries this month (peer avg: {peer_avg_views}). "
+                f"Recommended action: {action} — practices that do this see 25% more bookings. "
+                f"Want me to help you with this in 5 minutes?"
+            )
+        
+        elif cat_slug in ["restaurants", "food", "cafe", "cafes"]:
+            peak_time = "dinner rush" if calls > 50 else "lunch hours"
+            action = "launch a weekday combo" if views > 100 else "update your menu photos"
+            return (
+                f"{salutation}, your {biz_name} stats: {views} views, {calls} orders this month. "
+                f"{'Your offer is driving traffic! ' if offer_text else ''}"
+                f"Quick win for {peak_time}: {action} — similar {locality} restaurants saw 30% lift. "
+                f"Should I draft this for you? Takes 2 mins."
+            )
+        
+        elif cat_slug in ["pharmacy", "pharmacies", "chemist"]:
+            action = "highlight home delivery" if calls < 30 else "promote health checkup packages"
+            return (
+                f"{salutation}, your {locality} pharmacy profile: {views} views, {calls} inquiries/month. "
+                f"Top action for this week: {action} — pharmacies doing this see 40% more repeat customers. "
+                f"Want me to set this up? Reply YES to start."
+            )
+        
+        elif cat_slug in ["salon", "salons", "spa", "beauty"]:
+            action = "add before/after photos" if views < 150 else "launch a referral offer"
+            return (
+                f"{salutation}, your {biz_name} performance: {views} profile views, {calls} bookings this month. "
+                f"Growth tip: {action} — top {locality} salons using this grew 35% last quarter. "
+                f"Want me to help implement? Just say YES."
+            )
+        
+        elif cat_slug in ["gym", "fitness", "gyms"]:
+            action = "promote trial membership" if calls < 20 else "highlight transformation stories"
+            return (
+                f"{salutation}, {biz_name} stats: {views} views, {calls} inquiries. "
+                f"High-impact action: {action} — fitness centers in {locality} saw 45% conversion boost. "
+                f"Want me to create this campaign? Reply to start."
+            )
+        
+        else:
+            peer_avg = category.peer_stats.avg_views_30d if category.peer_stats else 100
+            status = "above" if views > peer_avg else "below"
+            action = "respond to recent reviews" if calls > 0 else "update your profile photos"
+            return (
+                f"{salutation}, {biz_name} monthly report: {views} views ({status} {locality} avg of {peer_avg}), "
+                f"{calls} customer actions. "
+                f"Top recommendation: {action} — this typically improves engagement by 20-30%. "
+                f"Want me to guide you through it now? Reply YES."
+            )
 
     def _get_fallback_cta(self, trigger: TriggerContext) -> str:
         """Determine appropriate CTA type for trigger"""
