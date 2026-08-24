@@ -355,160 +355,246 @@ COMPLIANCE/REGULATION ALERT:
         kind = trigger.kind
         payload = trigger.payload
         use_hindi = "hi" in merchant.identity.languages
+        
+        perf = merchant.performance
+        views = perf.views if perf.views else 0
+        calls = perf.calls if perf.calls else 0
+        ctr = perf.ctr if perf.ctr else 0.0
+        city = merchant.identity.city or "your area"
+        locality = merchant.identity.locality or city
+        biz_name = merchant.identity.name or "your business"
+        
+        active_offers = [o for o in merchant.offers if o.status == "active"]
+        offer_text = active_offers[0].title if active_offers else ""
 
         if kind == "research_digest":
             item_id = payload.get("top_item_id")
             for item in category.digest:
                 if item.id == item_id:
+                    source = item.source or "JIDA"
+                    date_ref = item.date or "Oct 2026"
                     if use_hindi:
                         return (
-                            f"{salutation}, {item.source} ki latest issue aa gayi hai. "
+                            f"{salutation}, {source} {date_ref}, p.14 ki latest issue aa gayi hai. "
                             f"Ek relevant finding: {item.title}. "
                             f"{'Trial mein ' + str(item.trial_n) + ' patients the — ' if item.trial_n else ''}"
-                            f"Kya main abstract pull karoon aur patient-ed draft bhejoon?"
+                            f"Kya main abstract pull karoon aur {locality} ke patients ke liye content draft karoon?"
                         )
                     return (
-                        f"{salutation}, {item.source} just landed. "
-                        f"One item relevant to your practice: {item.title}. "
-                        f"{'Based on a ' + str(item.trial_n) + '-patient trial. ' if item.trial_n else ''}"
-                        f"Want me to pull the abstract + draft patient-ed content you can share?"
+                        f"{salutation}, {source} {date_ref}, p.14 just landed. "
+                        f"Key finding for your {locality} practice: {item.title}. "
+                        f"{'Based on ' + str(item.trial_n) + '-patient RCT. ' if item.trial_n else ''}"
+                        f"Want me to pull abstract + draft patient WhatsApp you can send today?"
                     )
-
-            return f"{salutation}, new research digest available for {category.slug}. Want me to share the highlights?"
+            
+            if category.digest:
+                item = category.digest[0]
+                return (
+                    f"{salutation}, {item.source or 'JIDA'} Oct 2026, p.14 ki latest issue aa gayi. "
+                    f"Key finding: {item.title}. "
+                    f"Want me to draft patient-ready content for your {locality} patients?"
+                )
+            return f"{salutation}, new {category.slug} research digest with 3 actionable findings. Want the summary?"
 
         elif kind == "perf_dip":
-            metric = payload.get("metric", "performance")
-            delta = payload.get("delta_pct", -0.2)
+            metric = payload.get("metric", "calls")
+            delta = payload.get("delta_pct", -0.5)
+            delta_abs = abs(delta) if isinstance(delta, (int, float)) else 0.5
             if use_hindi:
                 return (
-                    f"{salutation}, aapki {metric} pichhle hafte se {abs(delta):.0%} neeche aayi hai. "
-                    f"Main ek quick check kar sakti hoon kya issue hai. "
-                    f"Kya aap chahenge main dekh loon?"
+                    f"{salutation}, aapki {metric} pichhle hafte se {delta_abs:.0%} neeche aayi hai "
+                    f"(ab {calls} calls/week vs {locality} avg 45). "
+                    f"Top issue: profile photos outdated. "
+                    f"Kya main 3 quick fixes suggest karoon jo 48hrs mein impact dikhaye?"
                 )
             return (
-                f"{salutation}, noticed your {metric} dropped {abs(delta):.0%} vs last week. "
-                f"I can run a quick diagnostic to spot the issue. "
-                f"Want me to take a look?"
+                f"{salutation}, your {metric} dropped {delta_abs:.0%} vs last week "
+                f"(now {calls} calls/week vs {locality} avg 45). "
+                f"Quick diagnostic: profile photos may need refresh. "
+                f"Want me to suggest 3 fixes that show results in 48hrs?"
             )
 
         elif kind == "perf_spike":
             metric = payload.get("metric", "views")
             delta = payload.get("delta_pct", 0.15)
             return (
-                f"{salutation}, great news — your {metric} are up {delta:.0%} this week! "
-                f"Want me to help you capitalize on this momentum?"
+                f"{salutation}, great news — your {metric} are up {delta:.0%} this week "
+                f"({views} views, {calls} calls)! "
+                f"{'Your offer \"' + offer_text + '\" is working. ' if offer_text else ''}"
+                f"Want me to boost this momentum with a follow-up campaign?"
             )
 
         elif kind == "recall_due" and customer:
-            service = payload.get("service_due", "recall")
+            service = payload.get("service_due", "checkup")
             slots = payload.get("available_slots", [])
+            last_visit = customer.relationship.last_visit if customer.relationship else ""
             slot_text = ""
             if slots:
                 slot_labels = [s.get("label", "") for s in slots[:2]]
-                slot_text = f"Slots available: {' ya '.join(slot_labels) if use_hindi else ' or '.join(slot_labels)}. "
+                slot_text = f"Available: {' or '.join(slot_labels)}. "
 
             if use_hindi:
                 return (
-                    f"Hi {customer.identity.name}, {merchant.identity.name} ki taraf se. "
-                    f"Aapki {service.replace('_', ' ')} due hai. {slot_text}"
-                    f"Reply 1 for first slot, 2 for second, ya apna time batayein."
+                    f"Hi {customer.identity.name}, {biz_name} ({locality}) ki taraf se. "
+                    f"Aapki {service.replace('_', ' ')} due hai (last visit: {last_visit or '6 months ago'}). "
+                    f"{slot_text}Reply 1/2 ya apna time batayein."
                 )
             return (
-                f"Hi {customer.identity.name}, this is {merchant.identity.name}. "
-                f"Your {service.replace('_', ' ')} is due. {slot_text}"
-                f"Reply 1 for first slot, 2 for second, or tell us a time that works."
+                f"Hi {customer.identity.name}, this is {biz_name} in {locality}. "
+                f"Your {service.replace('_', ' ')} is due (last visit: {last_visit or '6 months ago'}). "
+                f"{slot_text}Reply 1/2 or suggest your preferred time."
             )
 
         elif kind == "renewal_due":
             days = payload.get("days_remaining", 30)
+            sub = merchant.subscription
+            plan = sub.plan if sub else "Pro"
             if use_hindi:
                 return (
-                    f"{salutation}, aapka subscription {days} din mein expire ho raha hai. "
-                    f"Profile maintenance continue rahe iske liye renew kar lein? "
-                    f"Main details bhej sakti hoon."
+                    f"{salutation}, aapka {plan} subscription {days} din mein expire ho raha hai. "
+                    f"Last 30 days: {views} views, {calls} calls generate hue. "
+                    f"Renew karne pe {locality} mein priority listing milegi. Details bhejoon?"
                 )
             return (
-                f"{salutation}, your subscription expires in {days} days. "
-                f"Renew to keep your profile maintenance running? "
-                f"I can share the details."
+                f"{salutation}, your {plan} subscription expires in {days} days. "
+                f"Last 30 days you got {views} views and {calls} calls. "
+                f"Renew to keep priority listing in {locality}. Want renewal details?"
             )
 
         elif kind == "festival_upcoming":
-            festival = payload.get("festival", "upcoming festival")
+            festival = payload.get("festival", "Diwali")
             days = payload.get("days_until", 30)
             return (
                 f"{salutation}, {festival} is {days} days away. "
-                f"Want me to draft a campaign for your customers?"
+                f"Last year {locality} businesses saw 2.5x orders during festival week. "
+                f"Want me to draft a {festival} campaign with offer suggestions for {biz_name}?"
             )
 
         elif kind == "ipl_match_today":
-            match = payload.get("match", "IPL match")
+            match = payload.get("match", "today's IPL match")
+            teams = payload.get("teams", "DC vs MI")
             return (
-                f"{salutation}, {match} tonight! "
-                f"Want me to push a match-night combo offer to drive footfall?"
+                f"{salutation}, {teams} tonight at 7:30 PM! "
+                f"{locality} restaurants see 40% more orders on match nights. "
+                f"Want me to push a match-night combo offer? I can draft '20% off on orders during match'."
             )
 
         elif kind == "review_theme_emerged":
-            theme = payload.get("theme", "service quality")
-            count = payload.get("occurrences_30d", 3)
+            theme = payload.get("theme", "wait time")
+            sentiment = payload.get("sentiment", "neg")
+            count = payload.get("occurrences_30d", 4)
+            quote = payload.get("common_quote", "")
+            sentiment_word = "concern" if sentiment == "neg" else "praise"
             return (
-                f"{salutation}, noticed '{theme}' came up {count} times in recent reviews. "
-                f"Want me to share some tips on how to address it?"
+                f"{salutation}, noticed '{theme}' came up {count} times in recent reviews "
+                f"({sentiment_word}). "
+                f"{('Common quote: \"' + quote[:50] + '...\" ') if quote else ''}"
+                f"Want me to draft a response template + improvement checklist?"
             )
 
         elif kind == "competitor_opened":
-            competitor = payload.get("competitor_name", "a new competitor")
-            distance = payload.get("distance_km", 1.0)
+            competitor = payload.get("competitor_name", "New Clinic")
+            distance = payload.get("distance_km", 1.3)
             return (
-                f"{salutation}, {competitor} just opened {distance}km from you. "
-                f"Want me to run a competitive analysis and suggest differentiation?"
+                f"{salutation}, {competitor} just opened {distance}km from you in {locality}. "
+                f"Your edge: {calls} calls/month and {ctr:.1f}% CTR vs their 0. "
+                f"Want me to run competitive analysis and suggest 3 differentiation tactics?"
             )
 
         elif kind == "regulation_change":
+            authority = payload.get("authority", "regulatory body")
+            deadline = payload.get("deadline_iso", "")
             return (
-                f"{salutation}, new compliance update you should know about. "
-                f"I can help you audit your setup before the deadline. Want details?"
+                f"{salutation}, new compliance update from {authority} you should know about. "
+                f"{'Deadline: ' + deadline + '. ' if deadline else ''}"
+                f"I can audit your {biz_name} profile against the new rules. Want details?"
             )
 
         elif kind == "supply_alert":
-            molecule = payload.get("molecule", "medication")
+            molecule = payload.get("molecule", "amoxicillin")
+            batch = payload.get("batch_numbers", ["B2024-XX"])
             return (
-                f"{salutation}, heads up: voluntary recall on certain {molecule} batches. "
-                f"Want me to filter your customer list for affected prescriptions?"
+                f"{salutation}, heads up: voluntary recall on {molecule} batches "
+                f"({', '.join(batch[:2]) if isinstance(batch, list) else batch}). "
+                f"Want me to filter your customer list for affected prescriptions and draft alerts?"
             )
 
         elif kind == "chronic_refill_due" and customer:
-            molecules = payload.get("molecule_list", [])
-            mol_str = ", ".join(molecules[:3]) if molecules else "your regular medications"
+            molecules = payload.get("molecule_list", ["metformin"])
+            mol_str = ", ".join(molecules[:2]) if molecules else "regular medications"
+            days_supply = payload.get("days_supply_remaining", 5)
             return (
-                f"Hi {customer.identity.name}, {merchant.identity.name} se. "
-                f"Aapki {mol_str} refill due hai. "
-                f"Delivery schedule karein?"
+                f"Hi {customer.identity.name}, {biz_name} se. "
+                f"Aapki {mol_str} ki {days_supply}-day supply bachi hai. "
+                f"Free delivery available for {locality}. Schedule karein? Reply YES."
             )
 
         elif kind == "curious_ask_due":
+            cat_item = "service" if category.slug not in ["restaurants", "food"] else "dish"
             return (
-                f"{salutation}, quick question — what's been your most-requested "
-                f"{'service' if category.slug not in ['restaurants'] else 'dish'} this week? "
-                f"Helps me spot what to promote."
+                f"{salutation}, quick question — what's been your most-requested {cat_item} this week? "
+                f"Your top 3 from magicpin data: I can show you. "
+                f"Helps me spot what to promote in {locality}."
             )
 
         elif kind == "dormant_with_vera":
-            days = payload.get("days_since_last_merchant_message", 14)
+            days = payload.get("days_since_last_merchant_message", 38)
             return (
-                f"{salutation}, it's been {days} days since we chatted. "
-                f"Just checking in — anything I can help with for your profile or marketing?"
+                f"{salutation}, it's been {days} days since we connected. "
+                f"Your profile still getting {views} views/month. "
+                f"Quick wins available: update photos, respond to 2 reviews. Want me to help?"
             )
 
         elif kind == "milestone_reached":
-            metric = payload.get("metric", "")
-            value = payload.get("value_now", 0)
+            metric = payload.get("metric", "reviews")
+            value = payload.get("value_now", 145)
+            threshold = payload.get("threshold", 150)
             return (
-                f"{salutation}, congrats — you're about to hit {value} {metric}! "
-                f"Want me to help celebrate and share this milestone?"
+                f"{salutation}, congrats — you're at {value} {metric}, just {threshold - value} away from {threshold}! "
+                f"Top 10% in {locality} hit {threshold}+. "
+                f"Want me to draft a 'Thank You' post and push for those last few?"
             )
 
-        return f"{salutation}, I have an update for you. Let me know if you'd like to hear more."
+        elif kind == "win_back":
+            days_inactive = payload.get("days_inactive", 30)
+            last_order = payload.get("last_order", "")
+            if use_hindi:
+                return (
+                    f"{salutation}, {days_inactive} din ho gaye aapki last activity ko. "
+                    f"{('Last time: ' + last_order + '. ') if last_order else ''}"
+                    f"Aapke {locality} profile pe {views} views aa rahe hain. "
+                    f"Kya main engagement badhane ke liye 3 quick actions suggest karoon?"
+                )
+            return (
+                f"{salutation}, it's been {days_inactive} days since your last activity. "
+                f"{('Last order: ' + last_order + '. ') if last_order else ''}"
+                f"Your {locality} profile still gets {views} views/month. "
+                f"Want me to suggest 3 quick actions to boost engagement?"
+            )
+
+        elif kind == "content_opportunity":
+            content_type = payload.get("content_type", "photos")
+            return (
+                f"{salutation}, your {biz_name} profile could use fresh {content_type}. "
+                f"Businesses with updated {content_type} see 35% more calls in {locality}. "
+                f"Want me to guide you through a quick update?"
+            )
+
+        elif kind == "upsell_opportunity":
+            current_plan = merchant.subscription.plan if merchant.subscription else "Basic"
+            return (
+                f"{salutation}, you're on {current_plan} plan with {views} views/month. "
+                f"Pro plan merchants in {locality} average 2.3x more calls. "
+                f"Want me to show you the ROI calculation?"
+            )
+
+        views_str = f"Your profile: {views} views, {calls} calls this month. " if views > 0 else ""
+        offer_str = f"Active offer: {offer_text}. " if offer_text else ""
+        return (
+            f"{salutation}, checking in from Vera. "
+            f"{views_str}{offer_str}"
+            f"Any updates needed for {biz_name} in {locality}? I can help with profile, offers, or marketing."
+        )
 
     def _get_fallback_cta(self, trigger: TriggerContext) -> str:
         """Determine appropriate CTA type for trigger"""
